@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Firebase con Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+    // 🔥 Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCntGvrL0kqtiK9GAjiPxyzMct8V9vkyCg",
+      authDomain: "computercityfacturacion.firebaseapp.com",
+      projectId: "computercityfacturacion",
+      storageBucket: "computercityfacturacion.appspot.com",
+      messagingSenderId: "373209035675",
+      appId: "1:373209035675:web:c5026f2451c64a108a273e"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // === FUNCIÓN PRINCIPAL ===
+    async function iniciarDashboard() {
+      try {
+        // 🔐 Iniciar sesión automáticamente con tu usuario admin
+        const cred = await signInWithEmailAndPassword(auth, "admin@ejemplo.com", "123456");
+        console.log("✅ Sesión iniciada como:", cred.user.email);
+
+        await cargarDatos();
+      } catch (error) {
+        console.error("❌ Error al iniciar sesión:", error.message);
+        document.getElementById("estado").innerText = "Error al iniciar sesión. Revisa las credenciales.";
+      }
+    }
+
+    // === Cargar datos desde Firestore ===
+    async function cargarDatos() {
+      const facturasSnap = await getDocs(collection(db, "invoices"));
+      const productosSnap = await getDocs(collection(db, "products"));
+      const clientesSnap = await getDocs(collection(db, "clients"));
+
+
+      document.getElementById("totalFacturas").innerText = facturasSnap.size;
+      document.getElementById("totalProductos").innerText = productosSnap.size;
+      document.getElementById("totalClientes").innerText = clientesSnap.size;
+
+      let ventasPorCliente = {};
+      facturasSnap.forEach(doc => {
+        const factura = doc.data();
+        const cliente = factura.cliente || "Desconocido";
+        const totalFactura = factura.items?.reduce((sum, item) => sum + (item.subtotal || 0), 0) || 0;
+        ventasPorCliente[cliente] = (ventasPorCliente[cliente] || 0) + totalFactura;
+      });
+
+      renderChart(Object.keys(ventasPorCliente), Object.values(ventasPorCliente));
+      document.getElementById("estado").innerText = "Conectado correctamente ✅";
+    }
+
+    function renderChart(labels, data) {
+      new Chart(document.getElementById("ventasChart"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Ventas Totales ($)",
+            data,
+            backgroundColor: "#0ea5e9"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    iniciarDashboard();
+  </script>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+  <header class="bg-white shadow p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-sky-600">Dashboard de Facturación</h1>
+    <p id="estado" class="text-sm text-gray-500">Conectando...</p>
+  </header>
+
+  <main class="p-8 space-y-10">
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <div class="bg-white rounded-xl p-6 shadow border text-center">
+        <h2 class="text-gray-600">Total Facturas</h2>
+        <p id="totalFacturas" class="text-4xl font-bold text-sky-600">—</p>
+      </div>
+      <div class="bg-white rounded-xl p-6 shadow border text-center">
+        <h2 class="text-gray-600">Total Productos</h2>
+        <p id="totalProductos" class="text-4xl font-bold text-sky-600">—</p>
+      </div>
+      <div class="bg-white rounded-xl p-6 shadow border text-center">
+        <h2 class="text-gray-600">Total Clientes</h2>
+        <p id="totalClientes" class="text-4xl font-bold text-sky-600">—</p>
+      </div>
+    </section>
+
+    <section class="bg-white p-6 rounded-xl shadow border">
+      <h2 class="text-xl font-semibold mb-4">Ventas por Cliente</h2>
+      <canvas id="ventasChart" class="w-full h-64"></canvas>
+    </section>
+  </main>
+
+  <footer class="text-center py-4 text-sm text-gray-500">
+    &copy; 2025 Dashboard Facturación — Firebase Firestore
+  </footer>
+</body>
+</html>
